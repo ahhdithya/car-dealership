@@ -1,0 +1,1 @@
+-- Red-phase scaffold: the users table has not been implemented yet.
