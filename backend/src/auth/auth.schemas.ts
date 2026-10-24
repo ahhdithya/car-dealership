@@ -1,10 +1,12 @@
-export interface RegistrationInput {
-  email: string;
-  password: string;
-}
+import { z } from "zod";
+
+const registrationSchema = z.strictObject({
+  email: z.string().trim().toLowerCase().max(254).pipe(z.email()),
+  password: z.string().min(12).max(128),
+});
+
+export type RegistrationInput = z.infer<typeof registrationSchema>;
 
 export function parseRegistration(input: unknown): RegistrationInput {
-  // Temporary Red-phase scaffold.
-  void input;
-  throw new Error("Registration validation is not implemented.");
+  return registrationSchema.parse(input);
 }
