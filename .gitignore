@@ -1,0 +1,29 @@
+# Dependencies
+node_modules/
+
+# Build output
+dist/
+build/
+*.tsbuildinfo
+
+# Test output
+coverage/
+playwright-report/
+test-results/
+
+# Local environment files
+.env
+.env.*
+!.env.example
+
+# Logs
+*.log
+
+# Editor and operating system files
+.vscode/
+.idea/
+.DS_Store
+Thumbs.db
+
+#vitest
+.vitest/

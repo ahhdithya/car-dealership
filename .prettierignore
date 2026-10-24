@@ -1,0 +1,16 @@
+**/node_modules/
+**/dist/
+**/build/
+**/coverage/
+**/.vitest/
+**/playwright-report/
+**/test-results/
+
+package-lock.json
+
+**/.env
+**/.env.*
+!**/.env.example
+
+PROMPTS.md
+docs/screenshots/

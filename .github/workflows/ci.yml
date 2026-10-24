@@ -1,0 +1,85 @@
+name: CI
+
+on:
+  push:
+  pull_request:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  quality:
+    name: Quality checks and tests
+    runs-on: ubuntu-24.04
+    timeout-minutes: 15
+
+    services:
+      postgres:
+        image: postgres:18
+        env:
+          POSTGRES_USER: postgres
+          POSTGRES_PASSWORD: ci-admin-only
+          POSTGRES_DB: postgres
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd "pg_isready -U postgres -d postgres"
+          --health-interval 5s
+          --health-timeout 5s
+          --health-retries 10
+
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@v6
+        with:
+          persist-credentials: false
+
+      - name: Set up Node.js
+        uses: actions/setup-node@v6
+        with:
+          node-version-file: .node-version
+          cache: npm
+          cache-dependency-path: package-lock.json
+
+      - name: Install locked dependencies
+        run: npm ci
+
+      - name: Create dedicated test account and database
+        run: |
+          docker exec "${{ job.services.postgres.id }}" \
+            psql -U postgres -d postgres -v ON_ERROR_STOP=1 \
+            -c "CREATE ROLE dealership_test_user LOGIN PASSWORD 'ci-test-only' NOSUPERUSER NOCREATEDB NOCREATEROLE;"
+
+          docker exec "${{ job.services.postgres.id }}" \
+            psql -U postgres -d postgres -v ON_ERROR_STOP=1 \
+            -c "CREATE DATABASE dealership_test OWNER dealership_test_user;"
+
+      - name: Write disposable test configuration
+        run: |
+          cat > backend/.env.test <<'EOF'
+          NODE_ENV=test
+          PGHOST=localhost
+          PGPORT=5432
+          PGDATABASE=dealership_test
+          PGUSER=dealership_test_user
+          PGPASSWORD="ci-test-only"
+          EOF
+
+      - name: Check formatting
+        run: npm run format:check
+
+      - name: Run ESLint
+        run: npm run lint
+
+      - name: Check backend types
+        run: npm run typecheck --workspace=@car-dealership/backend
+
+      - name: Run backend tests
+        run: npm run test --workspace=@car-dealership/backend
+
+      - name: Run frontend tests
+        run: npm run test --workspace=@car-dealership/frontend
+
+      - name: Build frontend and check types
+        run: npm run build --workspace=@car-dealership/frontend
