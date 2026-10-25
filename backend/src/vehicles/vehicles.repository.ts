@@ -5,7 +5,13 @@ import type { CreateVehicleInput } from "./vehicles.schemas.js";
 export interface Vehicle extends CreateVehicleInput {
   id: string;
 }
-
+export interface VehicleFilters {
+  make?: string;
+  model?: string;
+  category?: string;
+  minPrice?: string;
+  maxPrice?: string;
+}
 export async function createVehicle(
   database: Pick<Client, "query">,
   input: CreateVehicleInput,
@@ -28,7 +34,12 @@ export async function createVehicle(
   return vehicle;
 }
 
-export async function listVehicles(database: Pick<Client, "query">): Promise<Vehicle[]> {
+export async function listVehicles(
+  database: Pick<Client, "query">,
+  filters: VehicleFilters = {},
+): Promise<Vehicle[]> {
+  void filters;
+
   const result = await database.query<Vehicle>(
     `
       SELECT id, make, model, category, price, stock

@@ -11,6 +11,7 @@ import request from "supertest";
 import { createApp } from "../../src/app.js";
 import type { RegistrationDependencies } from "../../src/auth/registration.service.js";
 import { signAccessToken } from "../../src/auth/tokens.js";
+
 const migrationSql = readFileSync(
   new URL("../../migrations/002_create_vehicles.sql", import.meta.url),
   "utf8",
@@ -161,6 +162,7 @@ describe("vehicles repository", () => {
     });
   });
 });
+
 describe("vehicle HTTP flow with PostgreSQL", () => {
   const secret = "vehicle-database-test-only-signing-key";
   const userId = "82df1573-4d97-4d4a-a7bb-caf495170d71";
@@ -262,6 +264,80 @@ describe("vehicle HTTP flow with PostgreSQL", () => {
       );
 
       expect(result.rows).toEqual([{ count: 0 }]);
+    });
+  });
+});
+
+describe("vehicle search", () => {
+  async function seedInventory(client: Client): Promise<void> {
+    const vehicles = [
+      {
+        make: "Toyota",
+        model: "Corolla",
+        category: "Sedan",
+        price: "25000.00",
+        stock: 0,
+      },
+      {
+        make: "Toyota",
+        model: "RAV4",
+        category: "SUV",
+        price: "35000.00",
+        stock: 2,
+      },
+      {
+        make: "Honda",
+        model: "Civic",
+        category: "Sedan",
+        price: "30000.00",
+        stock: 3,
+      },
+    ];
+
+    for (const vehicle of vehicles) {
+      await createVehicle(client, vehicle);
+    }
+  }
+
+  it("combines case-insensitive make, model, and category filters", async () => {
+    await withVehiclesTable(async (client) => {
+      await seedInventory(client);
+
+      const vehicles = await listVehicles(client, {
+        make: "TOY",
+        model: "roll",
+        category: "sedan",
+      });
+
+      expect(vehicles).toHaveLength(1);
+
+      expect(vehicles[0]).toMatchObject({
+        make: "Toyota",
+        model: "Corolla",
+        category: "Sedan",
+        stock: 0,
+      });
+    });
+  });
+
+  it("includes both price boundaries and excludes vehicles outside the range", async () => {
+    await withVehiclesTable(async (client) => {
+      await seedInventory(client);
+
+      const vehicles = await listVehicles(client, {
+        minPrice: "25000.00",
+        maxPrice: "30000.00",
+      });
+
+      expect(vehicles.map((vehicle) => vehicle.model)).toEqual(["Civic", "Corolla"]);
+    });
+  });
+
+  it("returns an empty list when no vehicle matches", async () => {
+    await withVehiclesTable(async (client) => {
+      await seedInventory(client);
+
+      await expect(listVehicles(client, { make: "Nonexistent" })).resolves.toEqual([]);
     });
   });
 });
