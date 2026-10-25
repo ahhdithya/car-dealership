@@ -1,6 +1,6 @@
 import type { Client } from "pg";
 
-import type { CreateVehicleInput } from "./vehicles.schemas.js";
+import type { CreateVehicleInput, UpdateVehicleInput } from "./vehicles.schemas.js";
 
 export interface Vehicle extends CreateVehicleInput {
   id: string;
@@ -147,4 +147,39 @@ export async function restockVehicle(
   }
 
   throw new StockLimitExceededError();
+}
+
+export async function updateVehicle(
+  database: Pick<Client, "query">,
+  id: string,
+  input: UpdateVehicleInput,
+): Promise<Vehicle> {
+  const result = await database.query<Vehicle>(
+    `
+      UPDATE vehicles
+      SET make = $2,
+          model = $3,
+          category = $4,
+          price = $5
+      WHERE id = $1
+      RETURNING id, make, model, category, price, stock
+    `,
+    [id, input.make, input.model, input.category, input.price],
+  );
+
+  const vehicle = result.rows[0];
+
+  if (!vehicle) {
+    throw new VehicleNotFoundError();
+  }
+
+  return vehicle;
+}
+
+export async function deleteVehicle(database: Pick<Client, "query">, id: string): Promise<void> {
+  const result = await database.query("DELETE FROM vehicles WHERE id = $1 RETURNING id", [id]);
+
+  if (result.rows.length === 0) {
+    throw new VehicleNotFoundError();
+  }
 }

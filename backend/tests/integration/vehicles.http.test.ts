@@ -29,6 +29,14 @@ function setup() {
 
     listVehicles: vi.fn<VehicleDependencies["listVehicles"]>().mockResolvedValue([vehicle]),
 
+    updateVehicle: async () => {
+      throw new Error("Unexpected update in this test.");
+    },
+
+    deleteVehicle: async () => {
+      throw new Error("Unexpected deletion in this test.");
+    },
+
     purchaseVehicle: async () => {
       throw new Error("Unexpected purchase in this test.");
     },

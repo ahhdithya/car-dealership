@@ -77,3 +77,10 @@ export function parseVehicleId(input: unknown): string {
 export function parseRestockVehicle(input: unknown): { quantity: number } {
   return restockVehicleSchema.parse(input);
 }
+const updateVehicleSchema = createVehicleSchema.omit({ stock: true });
+
+export type UpdateVehicleInput = z.infer<typeof updateVehicleSchema>;
+
+export function parseUpdateVehicle(input: unknown): UpdateVehicleInput {
+  return updateVehicleSchema.parse(input);
+}

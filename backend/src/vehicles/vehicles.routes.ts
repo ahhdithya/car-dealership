@@ -7,7 +7,9 @@ import {
   parseVehicleFilters,
   parseVehicleId,
   parseRestockVehicle,
+  parseUpdateVehicle,
   type CreateVehicleInput,
+  type UpdateVehicleInput,
 } from "./vehicles.schemas.js";
 
 export interface VehicleDependencies {
@@ -15,6 +17,8 @@ export interface VehicleDependencies {
   listVehicles(filters?: VehicleFilters): Promise<Vehicle[]>;
   purchaseVehicle(id: string): Promise<Vehicle>;
   restockVehicle(id: string, quantity: number): Promise<Vehicle>;
+  updateVehicle(id: string, input: UpdateVehicleInput): Promise<Vehicle>;
+  deleteVehicle(id: string): Promise<void>;
 }
 
 export function createVehicleRouter(
@@ -56,6 +60,22 @@ export function createVehicleRouter(
     const vehicle = await dependencies.restockVehicle(id, quantity);
 
     response.status(200).json({ vehicle });
+  });
+
+  router.put("/:id", requireAdmin, async (request, response) => {
+    const id = parseVehicleId(request.params.id);
+    const input = parseUpdateVehicle(request.body);
+    const vehicle = await dependencies.updateVehicle(id, input);
+
+    response.status(200).json({ vehicle });
+  });
+
+  router.delete("/:id", requireAdmin, async (request, response) => {
+    const id = parseVehicleId(request.params.id);
+
+    await dependencies.deleteVehicle(id);
+
+    response.status(204).end();
   });
 
   return router;

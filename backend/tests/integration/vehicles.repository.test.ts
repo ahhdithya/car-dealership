@@ -11,6 +11,8 @@ import {
   VehicleNotFoundError,
   purchaseVehicle,
   restockVehicle,
+  updateVehicle,
+  deleteVehicle,
 } from "../../src/vehicles/vehicles.repository.js";
 import { buildTestDatabaseConfig } from "../helpers/database.js";
 import request from "supertest";
@@ -187,6 +189,8 @@ describe("vehicle HTTP flow with PostgreSQL", () => {
           listVehicles: (filters) => listVehicles(client, filters),
           purchaseVehicle: (id) => purchaseVehicle(client, id),
           restockVehicle: (id, quantity) => restockVehicle(client, id, quantity),
+          updateVehicle: (id, input) => updateVehicle(client, id, input),
+          deleteVehicle: (id) => deleteVehicle(client, id),
         },
       },
     });

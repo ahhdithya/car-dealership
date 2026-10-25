@@ -14,6 +14,8 @@ import {
   listVehicles,
   purchaseVehicle,
   restockVehicle,
+  updateVehicle,
+  deleteVehicle,
 } from "./vehicles/vehicles.repository.js";
 
 const developmentSettingsSchema = z.object({
@@ -112,6 +114,8 @@ async function main(): Promise<void> {
           listVehicles: (filters) => listVehicles(pool, filters),
           purchaseVehicle: (id) => purchaseVehicle(pool, id),
           restockVehicle: (id, quantity) => restockVehicle(pool, id, quantity),
+          updateVehicle: (id, input) => updateVehicle(pool, id, input),
+          deleteVehicle: (id) => deleteVehicle(pool, id),
         },
       },
     });
