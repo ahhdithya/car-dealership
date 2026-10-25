@@ -1,13 +1,16 @@
 import { Router } from "express";
 
 import { authenticate, requireAdmin } from "../auth/auth.middleware.js";
-import type { Vehicle } from "./vehicles.repository.js";
-import { parseCreateVehicle } from "./vehicles.schemas.js";
-import type { CreateVehicleInput } from "./vehicles.schemas.js";
+import type { Vehicle, VehicleFilters } from "./vehicles.repository.js";
+import {
+  parseCreateVehicle,
+  parseVehicleFilters,
+  type CreateVehicleInput,
+} from "./vehicles.schemas.js";
 
 export interface VehicleDependencies {
-  createVehicle: (input: CreateVehicleInput) => Promise<Vehicle>;
-  listVehicles: () => Promise<Vehicle[]>;
+  createVehicle(input: CreateVehicleInput): Promise<Vehicle>;
+  listVehicles(filters?: VehicleFilters): Promise<Vehicle[]>;
 }
 
 export function createVehicleRouter(
@@ -18,8 +21,13 @@ export function createVehicleRouter(
 
   router.use(authenticate(tokenSecret));
 
-  router.get("/", async (_request, response) => {
-    const vehicles = await dependencies.listVehicles();
+  router.get(["/", "/search"], async (request, response) => {
+    const filters = parseVehicleFilters(request.query);
+
+    const vehicles =
+      Object.keys(filters).length === 0
+        ? await dependencies.listVehicles()
+        : await dependencies.listVehicles(filters);
 
     response.status(200).json({ vehicles });
   });

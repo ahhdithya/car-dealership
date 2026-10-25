@@ -1,5 +1,5 @@
 import { z } from "zod";
-
+import type { VehicleFilters } from "./vehicles.repository.js";
 const vehicleTextSchema = z.string().trim().min(1).max(100);
 
 const priceSchema = z
@@ -28,4 +28,39 @@ export type CreateVehicleInput = z.infer<typeof createVehicleSchema>;
 
 export function parseCreateVehicle(input: unknown): CreateVehicleInput {
   return createVehicleSchema.parse(input);
+}
+const searchTextSchema = z.string().trim().min(1).max(100);
+
+const searchPriceSchema = z.string().regex(/^(?:0|[1-9]\d{0,9})(?:\.\d{1,2})?$/);
+
+const vehicleFiltersSchema = z
+  .strictObject({
+    make: searchTextSchema.optional(),
+    model: searchTextSchema.optional(),
+    category: searchTextSchema.optional(),
+    minPrice: searchPriceSchema.optional(),
+    maxPrice: searchPriceSchema.optional(),
+  })
+  .refine(
+    (filters) =>
+      filters.minPrice === undefined ||
+      filters.maxPrice === undefined ||
+      Number(filters.minPrice) <= Number(filters.maxPrice),
+    {
+      message: "Minimum price must not exceed maximum price.",
+      path: ["maxPrice"],
+    },
+  );
+
+export function parseVehicleFilters(input: unknown): VehicleFilters {
+  const parsed = vehicleFiltersSchema.parse(input);
+  const filters: VehicleFilters = {};
+
+  if (parsed.make !== undefined) filters.make = parsed.make;
+  if (parsed.model !== undefined) filters.model = parsed.model;
+  if (parsed.category !== undefined) filters.category = parsed.category;
+  if (parsed.minPrice !== undefined) filters.minPrice = parsed.minPrice;
+  if (parsed.maxPrice !== undefined) filters.maxPrice = parsed.maxPrice;
+
+  return filters;
 }

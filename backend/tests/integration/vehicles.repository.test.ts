@@ -177,7 +177,7 @@ describe("vehicle HTTP flow with PostgreSQL", () => {
         tokenSecret: secret,
         repository: {
           createVehicle: (input) => createVehicle(client, input),
-          listVehicles: () => listVehicles(client),
+          listVehicles: (filters) => listVehicles(client, filters),
         },
       },
     });
@@ -264,6 +264,52 @@ describe("vehicle HTTP flow with PostgreSQL", () => {
       );
 
       expect(result.rows).toEqual([{ count: 0 }]);
+    });
+  });
+  it("applies HTTP search filters and rejects a reversed price range", async () => {
+    await withVehiclesTable(async (client) => {
+      await createVehicle(client, {
+        make: "Toyota",
+        model: "Corolla",
+        category: "Sedan",
+        price: "25000.00",
+        stock: 0,
+      });
+
+      await createVehicle(client, {
+        make: "Honda",
+        model: "Civic",
+        category: "Sedan",
+        price: "30000.00",
+        stock: 2,
+      });
+
+      const app = appFor(client);
+
+      const response = await request(app)
+        .get("/api/vehicles/search")
+        .set("Authorization", authorization("USER"))
+        .query({ make: "toy", maxPrice: "25000.00" })
+        .expect(200);
+
+      expect(response.body).toEqual({
+        vehicles: [
+          {
+            id: expect.any(String),
+            make: "Toyota",
+            model: "Corolla",
+            category: "Sedan",
+            price: "25000.00",
+            stock: 0,
+          },
+        ],
+      });
+
+      await request(app)
+        .get("/api/vehicles/search")
+        .set("Authorization", authorization("USER"))
+        .query({ minPrice: "30000", maxPrice: "25000" })
+        .expect(400);
     });
   });
 });

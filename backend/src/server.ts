@@ -104,7 +104,7 @@ async function main(): Promise<void> {
         tokenSecret: settings.JWT_SECRET,
         repository: {
           createVehicle: (input) => createVehicle(pool, input),
-          listVehicles: () => listVehicles(pool),
+          listVehicles: (filters) => listVehicles(pool, filters),
         },
       },
     });
