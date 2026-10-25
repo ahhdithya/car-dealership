@@ -1,0 +1,1 @@
+-- Vehicle table implementation follows after verifying the failing tests.
