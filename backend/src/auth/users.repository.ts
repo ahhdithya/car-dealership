@@ -41,7 +41,19 @@ export async function findUserByEmail(
   database: Pick<Client, "query">,
   email: string,
 ): Promise<AuthenticationUser | null> {
-  void database;
-  void email;
-  throw new Error("User lookup is not implemented.");
+  const result = await database.query<AuthenticationUser>(
+    `
+      SELECT
+        id,
+        email,
+        role,
+        created_at AS "createdAt",
+        password_hash AS "passwordHash"
+      FROM users
+      WHERE email = $1
+    `,
+    [email],
+  );
+
+  return result.rows[0] ?? null;
 }

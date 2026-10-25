@@ -10,12 +10,13 @@ export type RegistrationInput = z.infer<typeof registrationSchema>;
 export function parseRegistration(input: unknown): RegistrationInput {
   return registrationSchema.parse(input);
 }
-export interface LoginInput {
-  email: string;
-  password: string;
-}
+const loginSchema = z.strictObject({
+  email: z.string().trim().toLowerCase().max(254).pipe(z.email()),
+  password: z.string().min(1).max(128),
+});
+
+export type LoginInput = z.infer<typeof loginSchema>;
 
 export function parseLogin(input: unknown): LoginInput {
-  void input;
-  throw new Error("Login validation is not implemented.");
+  return loginSchema.parse(input);
 }
