@@ -61,3 +61,36 @@ export async function listVehicles(
 
   return result.rows;
 }
+export class VehicleNotFoundError extends Error {
+  constructor() {
+    super("Vehicle not found.");
+    this.name = "VehicleNotFoundError";
+  }
+}
+
+export class InsufficientStockError extends Error {
+  constructor() {
+    super("Vehicle is out of stock.");
+    this.name = "InsufficientStockError";
+  }
+}
+
+export async function purchaseVehicle(
+  database: Pick<Client, "query">,
+  id: string,
+): Promise<Vehicle> {
+  void database;
+  void id;
+  throw new Error("Vehicle purchase is not implemented.");
+}
+
+export async function restockVehicle(
+  database: Pick<Client, "query">,
+  id: string,
+  quantity: number,
+): Promise<Vehicle> {
+  void database;
+  void id;
+  void quantity;
+  throw new Error("Vehicle restock is not implemented.");
+}

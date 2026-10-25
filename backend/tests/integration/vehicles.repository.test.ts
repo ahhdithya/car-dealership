@@ -4,7 +4,14 @@ import { parse } from "dotenv";
 import { Client } from "pg";
 import { describe, expect, it, vi } from "vitest";
 
-import { createVehicle, listVehicles } from "../../src/vehicles/vehicles.repository.js";
+import {
+  createVehicle,
+  listVehicles,
+  InsufficientStockError,
+  VehicleNotFoundError,
+  purchaseVehicle,
+  restockVehicle,
+} from "../../src/vehicles/vehicles.repository.js";
 import { buildTestDatabaseConfig } from "../helpers/database.js";
 import request from "supertest";
 
@@ -384,6 +391,67 @@ describe("vehicle search", () => {
       await seedInventory(client);
 
       await expect(listVehicles(client, { make: "Nonexistent" })).resolves.toEqual([]);
+    });
+  });
+  describe("vehicle stock operations", () => {
+    const input = {
+      make: "Toyota",
+      model: "Corolla",
+      category: "Sedan",
+      price: "25000.00",
+      stock: 1,
+    };
+
+    it("purchases the last vehicle and rejects another purchase without changing stock", async () => {
+      await withVehiclesTable(async (client) => {
+        const vehicle = await createVehicle(client, input);
+
+        const purchased = await purchaseVehicle(client, vehicle.id);
+
+        expect(purchased).toEqual({ ...vehicle, stock: 0 });
+
+        await expect(purchaseVehicle(client, vehicle.id)).rejects.toBeInstanceOf(
+          InsufficientStockError,
+        );
+
+        const stored = await client.query<{ stock: number }>(
+          "SELECT stock FROM vehicles WHERE id = $1",
+          [vehicle.id],
+        );
+
+        expect(stored.rows).toEqual([{ stock: 0 }]);
+      });
+    });
+
+    it("adds the restock quantity to existing stock and persists it", async () => {
+      await withVehiclesTable(async (client) => {
+        const vehicle = await createVehicle(client, input);
+
+        const restocked = await restockVehicle(client, vehicle.id, 4);
+
+        expect(restocked).toEqual({ ...vehicle, stock: 5 });
+
+        const stored = await client.query<{ stock: number }>(
+          "SELECT stock FROM vehicles WHERE id = $1",
+          [vehicle.id],
+        );
+
+        expect(stored.rows).toEqual([{ stock: 5 }]);
+      });
+    });
+
+    it("reports a missing vehicle for purchase and restock", async () => {
+      await withVehiclesTable(async (client) => {
+        const missingId = randomUUID();
+
+        await expect(purchaseVehicle(client, missingId)).rejects.toBeInstanceOf(
+          VehicleNotFoundError,
+        );
+
+        await expect(restockVehicle(client, missingId, 2)).rejects.toBeInstanceOf(
+          VehicleNotFoundError,
+        );
+      });
     });
   });
 });
