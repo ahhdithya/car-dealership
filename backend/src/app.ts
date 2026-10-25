@@ -5,6 +5,7 @@ import { ZodError } from "zod";
 import { EmailAlreadyRegisteredError, registerUser } from "./auth/registration.service.js";
 import type { RegistrationDependencies } from "./auth/registration.service.js";
 import type { LoginDependencies } from "./auth/login.service.js";
+import { InvalidCredentialsError, loginUser } from "./auth/login.service.js";
 export interface AppDependencies {
   registration: RegistrationDependencies;
   login?: LoginDependencies;
@@ -21,6 +22,15 @@ export function createApp(dependencies: AppDependencies): Express {
 
     response.status(201).json({ user });
   });
+  const login = dependencies.login;
+
+  if (login) {
+    app.post("/api/auth/login", async (request, response) => {
+      const result = await loginUser(request.body, login);
+
+      response.status(200).json(result);
+    });
+  }
 
   app.use((error: unknown, request: Request, response: Response, next: NextFunction): void => {
     void request;
@@ -49,7 +59,15 @@ export function createApp(dependencies: AppDependencies): Express {
       });
       return;
     }
-
+    if (error instanceof InvalidCredentialsError) {
+      response.status(401).json({
+        error: {
+          code: "INVALID_CREDENTIALS",
+          message: error.message,
+        },
+      });
+      return;
+    }
     response.status(500).json({
       error: {
         code: "INTERNAL_SERVER_ERROR",
