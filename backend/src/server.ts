@@ -5,10 +5,13 @@ import { Pool } from "pg";
 import { z } from "zod";
 
 import { createApp } from "./app.js";
-import { hashPassword } from "./auth/password.js";
-import { createUser } from "./auth/users.repository.js";
+import { hashPassword, verifyPassword } from "./auth/password.js";
+import { createUser, findUserByEmail } from "./auth/users.repository.js";
+import { randomBytes } from "node:crypto";
+import { signAccessToken } from "./auth/tokens.js";
 
 const developmentSettingsSchema = z.object({
+  JWT_SECRET: z.string().regex(/^[0-9a-f]{64}$/i),
   NODE_ENV: z.literal("development"),
   PGHOST: z.literal("localhost"),
   PGPORT: z.literal("5432"),
@@ -23,7 +26,9 @@ async function main(): Promise<void> {
   );
 
   if (!parsed.success) {
-    throw new Error("Check backend/.env: development database settings are missing or invalid.");
+    throw new Error(
+      "Check backend/.env: development database settings or JWT_SECRET are missing or invalid.",
+    );
   }
 
   const settings = parsed.data;
@@ -78,10 +83,18 @@ async function main(): Promise<void> {
     // Fail before listening if the users migration has not been applied.
     await pool.query("SELECT id FROM public.users LIMIT 0");
 
+    const dummyPasswordHash = await hashPassword(randomBytes(32).toString("hex"));
+
     const app = createApp({
       registration: {
         hashPassword,
         createUser: (input) => createUser(pool, input),
+      },
+      login: {
+        findUserByEmail: (email) => findUserByEmail(pool, email),
+        verifyPassword,
+        signAccessToken: (user) => signAccessToken(user, settings.JWT_SECRET),
+        dummyPasswordHash,
       },
     });
 
