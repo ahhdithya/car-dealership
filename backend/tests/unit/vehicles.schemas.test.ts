@@ -12,20 +12,24 @@ describe("vehicle creation input validation", () => {
     stock: 3,
   };
 
-  it.each(["25000", "25000.5", "25000.50"])(
-    "trims vehicle details and normalizes price %s",
-    (price) => {
-      expect(
-        parseCreateVehicle({
-          make: "  Toyota  ",
-          model: "  Corolla  ",
-          category: "  Sedan  ",
-          price,
-          stock: 3,
-        }),
-      ).toEqual(validInput);
-    },
-  );
+  it.each([
+    { price: "25000", expected: "25000.00" },
+    { price: "25000.5", expected: "25000.50" },
+    { price: "25000.50", expected: "25000.50" },
+  ])("trims vehicle details and normalizes price $price", ({ price, expected }) => {
+    expect(
+      parseCreateVehicle({
+        make: "  Toyota  ",
+        model: "  Corolla  ",
+        category: "  Sedan  ",
+        price,
+        stock: 3,
+      }),
+    ).toEqual({
+      ...validInput,
+      price: expected,
+    });
+  });
 
   it("defaults omitted stock to zero", () => {
     expect(
