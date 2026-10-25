@@ -1,3 +1,6 @@
+import jwt from "jsonwebtoken";
+import { z } from "zod";
+
 export interface TokenUser {
   id: string;
   role: "USER" | "ADMIN";
@@ -10,14 +13,40 @@ export class InvalidTokenError extends Error {
   }
 }
 
+const issuer = "car-dealership-api";
+const audience = "car-dealership-web";
+
+const tokenClaimsSchema = z.object({
+  sub: z.string().uuid(),
+  role: z.enum(["USER", "ADMIN"]),
+  exp: z.number().int().positive(),
+});
+
 export function signAccessToken(user: TokenUser, secret: string): string {
-  void user;
-  void secret;
-  throw new Error("Token signing is not implemented.");
+  return jwt.sign({ role: user.role }, secret, {
+    algorithm: "HS256",
+    subject: user.id,
+    issuer,
+    audience,
+    expiresIn: 3600,
+  });
 }
 
 export function verifyAccessToken(token: string, secret: string): TokenUser {
-  void token;
-  void secret;
-  throw new Error("Token verification is not implemented.");
+  try {
+    const payload = jwt.verify(token, secret, {
+      algorithms: ["HS256"],
+      issuer,
+      audience,
+    });
+
+    const claims = tokenClaimsSchema.parse(payload);
+
+    return {
+      id: claims.sub,
+      role: claims.role,
+    };
+  } catch (error) {
+    throw new InvalidTokenError({ cause: error });
+  }
 }
