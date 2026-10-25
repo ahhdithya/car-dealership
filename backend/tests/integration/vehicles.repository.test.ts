@@ -323,6 +323,93 @@ describe("vehicle HTTP flow with PostgreSQL", () => {
     });
   });
 
+  it("allows an administrator to edit and delete a vehicle", async () => {
+    await withVehiclesTable(async (client) => {
+      const vehicle = await createVehicle(client, {
+        make: "Toyota",
+        model: "Corolla",
+        category: "Sedan",
+        price: "25000.00",
+        stock: 3,
+      });
+
+      const app = appFor(client);
+      const url = `/api/vehicles/${vehicle.id}`;
+
+      const edited = await request(app)
+        .put(url)
+        .set("Authorization", authorization("ADMIN"))
+        .send({
+          make: "  Honda  ",
+          model: "Civic",
+          category: "Sedan",
+          price: "27000.5",
+        })
+        .expect(200);
+
+      const expected = {
+        id: vehicle.id,
+        make: "Honda",
+        model: "Civic",
+        category: "Sedan",
+        price: "27000.50",
+        stock: 3,
+      };
+
+      expect(edited.body).toEqual({ vehicle: expected });
+
+      const stored = await client.query(
+        "SELECT id, make, model, category, price, stock FROM vehicles WHERE id = $1",
+        [vehicle.id],
+      );
+
+      expect(stored.rows).toEqual([expected]);
+
+      await request(app).delete(url).set("Authorization", authorization("ADMIN")).expect(204);
+
+      const remaining = await client.query("SELECT id FROM vehicles WHERE id = $1", [vehicle.id]);
+
+      expect(remaining.rows).toEqual([]);
+
+      await request(app).delete(url).set("Authorization", authorization("ADMIN")).expect(404);
+    });
+  });
+
+  it("rejects ordinary-user edits and deletes without changing the vehicle", async () => {
+    await withVehiclesTable(async (client) => {
+      const vehicle = await createVehicle(client, {
+        make: "Toyota",
+        model: "Corolla",
+        category: "Sedan",
+        price: "25000.00",
+        stock: 3,
+      });
+
+      const app = appFor(client);
+      const url = `/api/vehicles/${vehicle.id}`;
+
+      await request(app)
+        .put(url)
+        .set("Authorization", authorization("USER"))
+        .send({
+          make: "Honda",
+          model: "Civic",
+          category: "Sedan",
+          price: "1.00",
+        })
+        .expect(403);
+
+      await request(app).delete(url).set("Authorization", authorization("USER")).expect(403);
+
+      const stored = await client.query(
+        "SELECT id, make, model, category, price, stock FROM vehicles WHERE id = $1",
+        [vehicle.id],
+      );
+
+      expect(stored.rows).toEqual([vehicle]);
+    });
+  });
+
   // Moved here from the vehicle search describe block.
   it("allows user purchases and restricts valid restocking to administrators", async () => {
     await withVehiclesTable(async (client) => {
