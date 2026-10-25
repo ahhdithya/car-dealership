@@ -4,7 +4,7 @@ import { parse } from "dotenv";
 import { Client } from "pg";
 import { describe, expect, it } from "vitest";
 
-import { createUser } from "../../src/auth/users.repository.js";
+import { createUser, findUserByEmail } from "../../src/auth/users.repository.js";
 import { buildTestDatabaseConfig } from "../helpers/database.js";
 
 const migrationSql = readFileSync(
@@ -126,6 +126,41 @@ describe("users repository", () => {
         code: "23505",
         constraint: "users_email_unique",
       });
+    });
+  });
+});
+describe("user lookup for authentication", () => {
+  it("finds the matching account with its stored password hash", async () => {
+    await withUsersTable(async (client) => {
+      const passwordHash = "lookup-test-hash";
+
+      const user = await createUser(client, {
+        email: "login@example.com",
+        passwordHash,
+      });
+
+      await createUser(client, {
+        email: "other@example.com",
+        passwordHash: "another-test-hash",
+      });
+
+      const found = await findUserByEmail(client, "login@example.com");
+
+      expect(found).toEqual({
+        ...user,
+        passwordHash,
+      });
+    });
+  });
+
+  it("returns null when no account matches the email", async () => {
+    await withUsersTable(async (client) => {
+      await createUser(client, {
+        email: "existing@example.com",
+        passwordHash: "lookup-test-hash",
+      });
+
+      await expect(findUserByEmail(client, "missing@example.com")).resolves.toBeNull();
     });
   });
 });

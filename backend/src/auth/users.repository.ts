@@ -33,3 +33,15 @@ export async function createUser(
 
   return user;
 }
+export interface AuthenticationUser extends PublicUser {
+  passwordHash: string;
+}
+
+export async function findUserByEmail(
+  database: Pick<Client, "query">,
+  email: string,
+): Promise<AuthenticationUser | null> {
+  void database;
+  void email;
+  throw new Error("User lookup is not implemented.");
+}

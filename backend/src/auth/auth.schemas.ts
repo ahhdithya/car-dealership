@@ -10,3 +10,12 @@ export type RegistrationInput = z.infer<typeof registrationSchema>;
 export function parseRegistration(input: unknown): RegistrationInput {
   return registrationSchema.parse(input);
 }
+export interface LoginInput {
+  email: string;
+  password: string;
+}
+
+export function parseLogin(input: unknown): LoginInput {
+  void input;
+  throw new Error("Login validation is not implemented.");
+}
