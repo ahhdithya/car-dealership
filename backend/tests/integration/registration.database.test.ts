@@ -7,7 +7,8 @@ import { describe, expect, it } from "vitest";
 
 import { createApp } from "../../src/app.js";
 import { hashPassword, verifyPassword } from "../../src/auth/password.js";
-import { createUser } from "../../src/auth/users.repository.js";
+import { createUser, findUserByEmail } from "../../src/auth/users.repository.js";
+import { signAccessToken, verifyAccessToken } from "../../src/auth/tokens.js";
 import { buildTestDatabaseConfig } from "../helpers/database.js";
 
 const migrationSql = readFileSync(
@@ -178,6 +179,126 @@ describe("registration with PostgreSQL and Argon2", () => {
         error: {
           code: "VALIDATION_ERROR",
           message: "Invalid request body.",
+        },
+      });
+
+      const result = await client.query<{ count: number }>(
+        "SELECT count(*)::integer AS count FROM users",
+      );
+
+      expect(result.rows).toEqual([{ count: 0 }]);
+    });
+  });
+});
+const loginTestSecret = "integration-test-only-signing-key-not-for-development";
+
+async function loginAppFor(client: Client) {
+  const dummyPasswordHash = await hashPassword("Dummy integration-test password!");
+
+  return createApp({
+    registration: {
+      hashPassword,
+      createUser: (input) => createUser(client, input),
+    },
+    login: {
+      findUserByEmail: (email) => findUserByEmail(client, email),
+      verifyPassword,
+      signAccessToken: (user) => signAccessToken(user, loginTestSecret),
+      dummyPasswordHash,
+    },
+  });
+}
+
+describe("login with PostgreSQL, Argon2, and JWT", () => {
+  const password = "  Mixed CASE password!  ";
+
+  it("logs in a registered account and returns a verifiable token", async () => {
+    await withRegistrationDatabase(async (client) => {
+      const app = await loginAppFor(client);
+
+      const registration = await request(app)
+        .post("/api/auth/register")
+        .send({
+          email: "customer@example.com",
+          password,
+        })
+        .expect(201);
+
+      const response = await request(app)
+        .post("/api/auth/login")
+        .send({
+          email: "  CUSTOMER@EXAMPLE.COM  ",
+          password,
+        })
+        .expect("Content-Type", /json/)
+        .expect(200);
+
+      expect(response.body).toEqual({
+        accessToken: expect.any(String),
+        user: registration.body.user,
+      });
+
+      const accessToken: unknown = response.body.accessToken;
+
+      if (typeof accessToken !== "string") {
+        throw new Error("Expected an access token.");
+      }
+
+      expect(verifyAccessToken(accessToken, loginTestSecret)).toEqual({
+        id: registration.body.user.id,
+        role: "USER",
+      });
+
+      expect(response.body.user).not.toHaveProperty("password");
+      expect(response.body.user).not.toHaveProperty("passwordHash");
+      expect(response.body.user).not.toHaveProperty("password_hash");
+    });
+  });
+
+  it("rejects an incorrect password for an existing account", async () => {
+    await withRegistrationDatabase(async (client) => {
+      const app = await loginAppFor(client);
+
+      await createUser(client, {
+        email: "existing@example.com",
+        passwordHash: await hashPassword(password),
+      });
+
+      const response = await request(app)
+        .post("/api/auth/login")
+        .send({
+          email: "existing@example.com",
+          password: "Incorrect password!",
+        })
+        .expect("Content-Type", /json/)
+        .expect(401);
+
+      expect(response.body).toEqual({
+        error: {
+          code: "INVALID_CREDENTIALS",
+          message: "Invalid email or password.",
+        },
+      });
+    });
+  });
+
+  it("rejects an unknown email with the same authentication response", async () => {
+    await withRegistrationDatabase(async (client) => {
+      const app = await loginAppFor(client);
+
+      const response = await request(app)
+        .post("/api/auth/login")
+        .send({
+          email: "missing@example.com",
+          password,
+        })
+        .expect("Content-Type", /json/)
+        .expect(401);
+
+      expect(response.body).toEqual({
+        error: {
+          code: "INVALID_CREDENTIALS",
+          message: "Invalid email or password.",
         },
       });
 
