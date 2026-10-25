@@ -4,9 +4,10 @@ import { ZodError } from "zod";
 
 import { EmailAlreadyRegisteredError, registerUser } from "./auth/registration.service.js";
 import type { RegistrationDependencies } from "./auth/registration.service.js";
-
+import type { LoginDependencies } from "./auth/login.service.js";
 export interface AppDependencies {
   registration: RegistrationDependencies;
+  login?: LoginDependencies;
 }
 
 export function createApp(dependencies: AppDependencies): Express {
