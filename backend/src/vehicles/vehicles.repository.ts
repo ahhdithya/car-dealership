@@ -10,12 +10,32 @@ export async function createVehicle(
   database: Pick<Client, "query">,
   input: CreateVehicleInput,
 ): Promise<Vehicle> {
-  void database;
-  void input;
-  throw new Error("Vehicle creation is not implemented.");
+  const result = await database.query<Vehicle>(
+    `
+      INSERT INTO vehicles (make, model, category, price, stock)
+      VALUES ($1, $2, $3, $4, $5)
+      RETURNING id, make, model, category, price, stock
+    `,
+    [input.make, input.model, input.category, input.price, input.stock],
+  );
+
+  const vehicle = result.rows[0];
+
+  if (!vehicle) {
+    throw new Error("Vehicle creation returned no vehicle.");
+  }
+
+  return vehicle;
 }
 
 export async function listVehicles(database: Pick<Client, "query">): Promise<Vehicle[]> {
-  void database;
-  throw new Error("Vehicle listing is not implemented.");
+  const result = await database.query<Vehicle>(
+    `
+      SELECT id, make, model, category, price, stock
+      FROM vehicles
+      ORDER BY make, model, id
+    `,
+  );
+
+  return result.rows;
 }
