@@ -2,11 +2,15 @@ import { randomUUID } from "node:crypto";
 import { readFileSync } from "node:fs";
 import { parse } from "dotenv";
 import { Client } from "pg";
-import { describe, expect, it } from "vitest";
+import { describe, expect, it, vi } from "vitest";
 
 import { createVehicle, listVehicles } from "../../src/vehicles/vehicles.repository.js";
 import { buildTestDatabaseConfig } from "../helpers/database.js";
+import request from "supertest";
 
+import { createApp } from "../../src/app.js";
+import type { RegistrationDependencies } from "../../src/auth/registration.service.js";
+import { signAccessToken } from "../../src/auth/tokens.js";
 const migrationSql = readFileSync(
   new URL("../../migrations/002_create_vehicles.sql", import.meta.url),
   "utf8",
@@ -154,6 +158,110 @@ describe("vehicles repository", () => {
       const listed = await listVehicles(client);
 
       expect(listed).toEqual([vehicles[3], vehicles[2], vehicles[1], vehicles[0]]);
+    });
+  });
+});
+describe("vehicle HTTP flow with PostgreSQL", () => {
+  const secret = "vehicle-database-test-only-signing-key";
+  const userId = "82df1573-4d97-4d4a-a7bb-caf495170d71";
+
+  function appFor(client: Client) {
+    return createApp({
+      registration: {
+        hashPassword: vi.fn<RegistrationDependencies["hashPassword"]>(),
+        createUser: vi.fn<RegistrationDependencies["createUser"]>(),
+      },
+      vehicles: {
+        tokenSecret: secret,
+        repository: {
+          createVehicle: (input) => createVehicle(client, input),
+          listVehicles: () => listVehicles(client),
+        },
+      },
+    });
+  }
+
+  function authorization(role: "USER" | "ADMIN"): string {
+    return `Bearer ${signAccessToken({ id: userId, role }, secret)}`;
+  }
+
+  const input = {
+    make: "  Toyota  ",
+    model: "Corolla",
+    category: "Sedan",
+    price: "25000.5",
+    stock: 0,
+  };
+
+  it("persists an administrator-created vehicle and lists it for an ordinary user", async () => {
+    await withVehiclesTable(async (client) => {
+      const app = appFor(client);
+
+      const created = await request(app)
+        .post("/api/vehicles")
+        .set("Authorization", authorization("ADMIN"))
+        .send(input)
+        .expect(201);
+
+      expect(created.body).toEqual({
+        vehicle: {
+          id: expect.stringMatching(
+            /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i,
+          ),
+          make: "Toyota",
+          model: "Corolla",
+          category: "Sedan",
+          price: "25000.50",
+          stock: 0,
+        },
+      });
+
+      const stored = await client.query(
+        "SELECT id, make, model, category, price, stock FROM vehicles",
+      );
+
+      expect(stored.rows).toEqual([created.body.vehicle]);
+
+      const listed = await request(app)
+        .get("/api/vehicles")
+        .set("Authorization", authorization("USER"))
+        .expect(200);
+
+      expect(listed.body).toEqual({
+        vehicles: [created.body.vehicle],
+      });
+    });
+  });
+
+  it("prevents an ordinary user from inserting a vehicle", async () => {
+    await withVehiclesTable(async (client) => {
+      await request(appFor(client))
+        .post("/api/vehicles")
+        .set("Authorization", authorization("USER"))
+        .send(input)
+        .expect(403);
+
+      const result = await client.query<{ count: number }>(
+        "SELECT count(*)::integer AS count FROM vehicles",
+      );
+
+      expect(result.rows).toEqual([{ count: 0 }]);
+    });
+  });
+
+  it("prevents invalid administrator input from reaching storage", async () => {
+    await withVehiclesTable(async (client) => {
+      await request(appFor(client))
+        .post("/api/vehicles")
+        .set("Authorization", authorization("ADMIN"))
+        .send({ ...input, price: "-1.00" })
+        .expect(400);
+
+      const result = await client.query<{ count: number }>(
+        "SELECT count(*)::integer AS count FROM vehicles",
+      );
+
+      expect(result.rows).toEqual([{ count: 0 }]);
     });
   });
 });

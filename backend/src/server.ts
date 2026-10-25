@@ -9,6 +9,7 @@ import { hashPassword, verifyPassword } from "./auth/password.js";
 import { createUser, findUserByEmail } from "./auth/users.repository.js";
 import { randomBytes } from "node:crypto";
 import { signAccessToken } from "./auth/tokens.js";
+import { createVehicle, listVehicles } from "./vehicles/vehicles.repository.js";
 
 const developmentSettingsSchema = z.object({
   JWT_SECRET: z.string().regex(/^[0-9a-f]{64}$/i),
@@ -83,6 +84,9 @@ async function main(): Promise<void> {
     // Fail before listening if the users migration has not been applied.
     await pool.query("SELECT id FROM public.users LIMIT 0");
 
+    // Fail before listening if the vehicles migration has not been applied.
+    await pool.query("SELECT id FROM public.vehicles LIMIT 0");
+
     const dummyPasswordHash = await hashPassword(randomBytes(32).toString("hex"));
 
     const app = createApp({
@@ -96,12 +100,20 @@ async function main(): Promise<void> {
         signAccessToken: (user) => signAccessToken(user, settings.JWT_SECRET),
         dummyPasswordHash,
       },
+      vehicles: {
+        tokenSecret: settings.JWT_SECRET,
+        repository: {
+          createVehicle: (input) => createVehicle(pool, input),
+          listVehicles: () => listVehicles(pool),
+        },
+      },
     });
 
     const server = createServer(app);
 
     await new Promise<void>((resolve, reject) => {
       server.once("error", reject);
+
       server.listen(3000, "127.0.0.1", () => {
         server.off("error", reject);
         resolve();
