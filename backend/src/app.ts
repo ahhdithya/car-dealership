@@ -6,9 +6,15 @@ import { EmailAlreadyRegisteredError, registerUser } from "./auth/registration.s
 import type { RegistrationDependencies } from "./auth/registration.service.js";
 import type { LoginDependencies } from "./auth/login.service.js";
 import { InvalidCredentialsError, loginUser } from "./auth/login.service.js";
+import { createVehicleRouter } from "./vehicles/vehicles.routes.js";
+import type { VehicleDependencies } from "./vehicles/vehicles.routes.js";
 export interface AppDependencies {
   registration: RegistrationDependencies;
   login?: LoginDependencies;
+  vehicles?: {
+    repository: VehicleDependencies;
+    tokenSecret: string;
+  };
 }
 
 export function createApp(dependencies: AppDependencies): Express {
@@ -31,7 +37,12 @@ export function createApp(dependencies: AppDependencies): Express {
       response.status(200).json(result);
     });
   }
-
+  if (dependencies.vehicles) {
+    app.use(
+      "/api/vehicles",
+      createVehicleRouter(dependencies.vehicles.repository, dependencies.vehicles.tokenSecret),
+    );
+  }
   app.use((error: unknown, request: Request, response: Response, next: NextFunction): void => {
     void request;
 
