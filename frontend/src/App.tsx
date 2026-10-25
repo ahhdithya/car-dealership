@@ -428,9 +428,9 @@ export default function App() {
                         {vehicle.make} {vehicle.model}
                       </h3>
                       <p className="price">
-                        {Number(vehicle.price).toLocaleString("en-IN", {
-                          minimumFractionDigits: 2,
-                          maximumFractionDigits: 2,
+                        {Number(vehicle.price).toLocaleString("en-US", {
+                          style: "currency",
+                          currency: "USD",
                         })}
                       </p>
                       <p className={vehicle.stock === 0 ? "stock sold-out" : "stock"}>
