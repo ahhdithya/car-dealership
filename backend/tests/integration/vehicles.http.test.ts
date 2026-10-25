@@ -26,7 +26,16 @@ function setup() {
 
   const repository = {
     createVehicle: vi.fn<VehicleDependencies["createVehicle"]>().mockResolvedValue(vehicle),
+
     listVehicles: vi.fn<VehicleDependencies["listVehicles"]>().mockResolvedValue([vehicle]),
+
+    purchaseVehicle: async () => {
+      throw new Error("Unexpected purchase in this test.");
+    },
+
+    restockVehicle: async () => {
+      throw new Error("Unexpected restock in this test.");
+    },
   };
 
   const app = createApp({
@@ -136,11 +145,13 @@ describe("vehicle HTTP endpoints", () => {
       .expect(200);
 
     expect(response.body).toEqual({ vehicles: [vehicle] });
+
     expect(repository.listVehicles).toHaveBeenCalledExactlyOnceWith();
   });
 
   it("returns an empty inventory array", async () => {
     const { app, repository } = setup();
+
     repository.listVehicles.mockResolvedValue([]);
 
     const response = await request(app)

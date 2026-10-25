@@ -8,6 +8,11 @@ import type { LoginDependencies } from "./auth/login.service.js";
 import { InvalidCredentialsError, loginUser } from "./auth/login.service.js";
 import { createVehicleRouter } from "./vehicles/vehicles.routes.js";
 import type { VehicleDependencies } from "./vehicles/vehicles.routes.js";
+import {
+  InsufficientStockError,
+  StockLimitExceededError,
+  VehicleNotFoundError,
+} from "./vehicles/vehicles.repository.js";
 export interface AppDependencies {
   registration: RegistrationDependencies;
   login?: LoginDependencies;
@@ -74,6 +79,35 @@ export function createApp(dependencies: AppDependencies): Express {
       response.status(401).json({
         error: {
           code: "INVALID_CREDENTIALS",
+          message: error.message,
+        },
+      });
+      return;
+    }
+    if (error instanceof VehicleNotFoundError) {
+      response.status(404).json({
+        error: {
+          code: "VEHICLE_NOT_FOUND",
+          message: error.message,
+        },
+      });
+      return;
+    }
+
+    if (error instanceof InsufficientStockError) {
+      response.status(409).json({
+        error: {
+          code: "OUT_OF_STOCK",
+          message: error.message,
+        },
+      });
+      return;
+    }
+
+    if (error instanceof StockLimitExceededError) {
+      response.status(409).json({
+        error: {
+          code: "STOCK_LIMIT_EXCEEDED",
           message: error.message,
         },
       });

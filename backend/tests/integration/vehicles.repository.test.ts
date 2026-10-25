@@ -185,6 +185,8 @@ describe("vehicle HTTP flow with PostgreSQL", () => {
         repository: {
           createVehicle: (input) => createVehicle(client, input),
           listVehicles: (filters) => listVehicles(client, filters),
+          purchaseVehicle: (id) => purchaseVehicle(client, id),
+          restockVehicle: (id, quantity) => restockVehicle(client, id, quantity),
         },
       },
     });
@@ -273,6 +275,7 @@ describe("vehicle HTTP flow with PostgreSQL", () => {
       expect(result.rows).toEqual([{ count: 0 }]);
     });
   });
+
   it("applies HTTP search filters and rejects a reversed price range", async () => {
     await withVehiclesTable(async (client) => {
       await createVehicle(client, {
@@ -317,6 +320,61 @@ describe("vehicle HTTP flow with PostgreSQL", () => {
         .set("Authorization", authorization("USER"))
         .query({ minPrice: "30000", maxPrice: "25000" })
         .expect(400);
+    });
+  });
+
+  // Moved here from the vehicle search describe block.
+  it("allows user purchases and restricts valid restocking to administrators", async () => {
+    await withVehiclesTable(async (client) => {
+      const vehicle = await createVehicle(client, {
+        make: "Toyota",
+        model: "Corolla",
+        category: "Sedan",
+        price: "25000.00",
+        stock: 1,
+      });
+
+      const app = appFor(client);
+      const purchaseUrl = `/api/vehicles/${vehicle.id}/purchase`;
+      const restockUrl = `/api/vehicles/${vehicle.id}/restock`;
+
+      await request(app).post(purchaseUrl).expect(401);
+
+      const purchased = await request(app)
+        .post(purchaseUrl)
+        .set("Authorization", authorization("USER"))
+        .expect(200);
+
+      expect(purchased.body.vehicle.stock).toBe(0);
+
+      await request(app).post(purchaseUrl).set("Authorization", authorization("USER")).expect(409);
+
+      await request(app)
+        .post(restockUrl)
+        .set("Authorization", authorization("USER"))
+        .send({ quantity: 3 })
+        .expect(403);
+
+      await request(app)
+        .post(restockUrl)
+        .set("Authorization", authorization("ADMIN"))
+        .send({ quantity: -1 })
+        .expect(400);
+
+      const restocked = await request(app)
+        .post(restockUrl)
+        .set("Authorization", authorization("ADMIN"))
+        .send({ quantity: 3 })
+        .expect(200);
+
+      expect(restocked.body.vehicle.stock).toBe(3);
+
+      const stored = await client.query<{ stock: number }>(
+        "SELECT stock FROM vehicles WHERE id = $1",
+        [vehicle.id],
+      );
+
+      expect(stored.rows).toEqual([{ stock: 3 }]);
     });
   });
 });
@@ -393,6 +451,7 @@ describe("vehicle search", () => {
       await expect(listVehicles(client, { make: "Nonexistent" })).resolves.toEqual([]);
     });
   });
+
   describe("vehicle stock operations", () => {
     const input = {
       make: "Toyota",

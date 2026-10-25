@@ -64,3 +64,16 @@ export function parseVehicleFilters(input: unknown): VehicleFilters {
 
   return filters;
 }
+const vehicleIdSchema = z.string().uuid();
+
+const restockVehicleSchema = z.strictObject({
+  quantity: z.number().int().min(1).max(2147483647),
+});
+
+export function parseVehicleId(input: unknown): string {
+  return vehicleIdSchema.parse(input);
+}
+
+export function parseRestockVehicle(input: unknown): { quantity: number } {
+  return restockVehicleSchema.parse(input);
+}

@@ -9,7 +9,12 @@ import { hashPassword, verifyPassword } from "./auth/password.js";
 import { createUser, findUserByEmail } from "./auth/users.repository.js";
 import { randomBytes } from "node:crypto";
 import { signAccessToken } from "./auth/tokens.js";
-import { createVehicle, listVehicles } from "./vehicles/vehicles.repository.js";
+import {
+  createVehicle,
+  listVehicles,
+  purchaseVehicle,
+  restockVehicle,
+} from "./vehicles/vehicles.repository.js";
 
 const developmentSettingsSchema = z.object({
   JWT_SECRET: z.string().regex(/^[0-9a-f]{64}$/i),
@@ -105,6 +110,8 @@ async function main(): Promise<void> {
         repository: {
           createVehicle: (input) => createVehicle(pool, input),
           listVehicles: (filters) => listVehicles(pool, filters),
+          purchaseVehicle: (id) => purchaseVehicle(pool, id),
+          restockVehicle: (id, quantity) => restockVehicle(pool, id, quantity),
         },
       },
     });
