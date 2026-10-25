@@ -16,7 +16,20 @@ export async function createUser(
   database: Pick<Client, "query">,
   input: CreateUserInput,
 ): Promise<PublicUser> {
-  void database;
-  void input;
-  throw new Error("User creation is not implemented.");
+  const result = await database.query<PublicUser>(
+    `
+      INSERT INTO users (email, password_hash)
+      VALUES ($1, $2)
+      RETURNING id, email, role, created_at AS "createdAt"
+    `,
+    [input.email, input.passwordHash],
+  );
+
+  const user = result.rows[0];
+
+  if (!user) {
+    throw new Error("User creation returned no account.");
+  }
+
+  return user;
 }
